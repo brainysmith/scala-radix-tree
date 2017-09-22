@@ -7,18 +7,19 @@ sealed trait Node[V] { val isLeaf: Boolean }
 final case class MiddleNode[V](val edges: Array[Edge[V]]) extends Node[V] { val isLeaf = false }
 final case class LeafNode[V](val value: V) extends Node[V] { val isLeaf = true }
 
-
 class RadixTree[V](private val root: MiddleNode[V]) {
 
   def insert(key: String, value: V): RadixTree[V] = new RadixTree(_update(key, value, root))
 
   def lookup(key: String): Option[V] = _search(root.edges, key)
 
-  def findAllWithPrefix(prefix: String): Seq[V] = ???
+  def findAllWithPrefix(prefix: String): Seq[V] = _searchWithPrefix(root.edges, prefix)
 
-  def foldDepth[A](acc: A)(op: (A, (String, Option[V])) => A) = _depthFirstTravers(acc)(op)
+  def foldDepth[A](acc: A)(op: (A, (String, Option[V])) => A) = _depthFirstTravers(root.edges)(acc)(op)
 
-  def foldBreadth[A](acc: A)(op: (A, (String, Option[V])) => A) = _breadthFirstTravers(acc)(op)
+  def foldBreadth[A](acc: A)(op: (A, (String, Option[V])) => A) = _breadthFirstTravers(root.edges)(acc)(op)
+
+  //def remove(key: String): RadixTree[V] = ???
 
 
 
@@ -82,6 +83,18 @@ class RadixTree[V](private val root: MiddleNode[V]) {
     }
   }
 
+  /*private def _delete(key: String, root: MiddleNode[V]): MiddleNode[V] = {
+    val idx = root.edges.indexWhere(e => (key.isEmpty && e.prefix.isEmpty) || (e.prefix.nonEmpty && key.startsWith(e.prefix)))
+    if(idx = -1) {
+      root
+    } else {
+      root.edges(idx) match {
+        case Edge(p, LeafNode(_)) if key == p => MiddleNode(root.edges.)
+      }
+    }
+  }*/
+
+
   @tailrec private def _search(edges: Array[Edge[V]], key: String): Option[V] = {
     edges.find(e => (key.isEmpty && e.prefix.isEmpty) || (e.prefix.nonEmpty && key.startsWith(e.prefix))) match {
       case None => None
@@ -91,7 +104,25 @@ class RadixTree[V](private val root: MiddleNode[V]) {
     }
   }
 
-  @inline private def _depthFirstTravers[A](acc: A)(op: (A, (String, Option[V])) => A) = {
+  @tailrec private def _searchWithPrefix(edges: Array[Edge[V]], prefix: String): Seq[V] = {
+    if(prefix.isEmpty) {
+      _depthFirstTravers(edges)(Seq[V]()){case (a, (_, Some(b))) => a :+ b
+      case (a, (_, None)) => a}
+    } else {
+      _matched(edges, prefix) match {
+        case None => Seq[V]()
+        case Some(p) => edges(p) match {
+          case Edge(p, MiddleNode(es)) if p == prefix || p.startsWith(prefix) => _depthFirstTravers(es)(Seq[V]()){case (a, (_, Some(b))) => a :+ b
+            case (a, (_, None)) => a}
+          case Edge(p, LeafNode(v)) if p == prefix || p.startsWith(prefix) => Seq(v)
+          case Edge(p, MiddleNode(es)) if prefix.startsWith(p) => _searchWithPrefix(es, prefix.drop(p.length))
+          case Edge(p, LeafNode(_)) if prefix.startsWith(p) => Seq[V]()
+        }
+      }
+    }
+  }
+
+  @inline private def _depthFirstTravers[A](rte: Array[Edge[V]])(acc: A)(op: (A, (String, Option[V])) => A) = {
     @tailrec def __depth(nodes: List[Edge[V]], a: A): A = nodes match {
       case Nil => a
       case Edge(prefix, LeafNode(value)) :: tail => 
@@ -99,10 +130,10 @@ class RadixTree[V](private val root: MiddleNode[V]) {
       case Edge(prefix, MiddleNode(edges)) :: tail => 
         __depth(edges.toList ::: tail, op(a, (prefix, None)))
     }
-    __depth(root.edges.toList, acc)
+    __depth(rte.toList, acc)
   }
 
-  @inline private def _breadthFirstTravers[A](acc: A)(op: (A, (String, Option[V])) => A) = {
+  @inline private def _breadthFirstTravers[A](rte: Array[Edge[V]])(acc: A)(op: (A, (String, Option[V])) => A) = {
     @tailrec def __depth(nodes: List[Edge[V]], a: A): A = nodes match {
       case Nil => a
       case Edge(prefix, LeafNode(value)) :: tail => 
@@ -110,7 +141,7 @@ class RadixTree[V](private val root: MiddleNode[V]) {
       case Edge(prefix, MiddleNode(edges)) :: tail => 
         __depth(tail ::: edges.toList, op(a, (prefix, None)))
     }
-    __depth(root.edges.toList, acc)
+    __depth(rte.toList, acc)
   }
 
 }

@@ -44,4 +44,18 @@ class RadixTreeSpec extends FlatSpec with Matchers {
       rt.lookup("toast") shouldEqual Some(7)
   }
 
+  "The RadixTree " should "search with prefix correctly" in {
+    val rt = RadixTree("tester" -> 1, "slow" -> 2)
+      .insert("water", 3)
+      .insert("slower", 4)
+      .insert("test", 5)
+      .insert("team", 6)
+      .insert("toast", 7)
+
+      rt.findAllWithPrefix("none") shouldEqual List()
+      rt.findAllWithPrefix("test") shouldEqual List(1, 5)
+      rt.findAllWithPrefix("te") shouldEqual List(1, 5, 6)
+      rt.findAllWithPrefix("t") shouldEqual List(1, 5, 6, 7)
+      rt.findAllWithPrefix("") shouldEqual List(1, 5, 6, 7, 2, 4, 3)
+  }
 }

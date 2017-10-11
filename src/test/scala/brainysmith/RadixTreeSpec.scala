@@ -58,4 +58,76 @@ class RadixTreeSpec extends FlatSpec with Matchers {
       rt.findAllWithPrefix("t") shouldEqual List(1, 5, 6, 7)
       rt.findAllWithPrefix("") shouldEqual List(1, 5, 6, 7, 2, 4, 3)
   }
+
+  "The RadixTree " should "delete correctly" in {
+    val rt = RadixTree("tester" -> 1, "slow" -> 2)
+      .insert("water", 3)
+      .insert("slower", 4)
+      .insert("test", 5)
+      .insert("team", 6)
+      .insert("toast", 7)
+
+    val test1 = rt.remove("slower")
+    test1.lookup("tester") shouldEqual Some(1)
+    test1.lookup("slow") shouldEqual Some(2)
+    test1.lookup("water") shouldEqual Some(3)
+    test1.lookup("slower") shouldEqual None
+    test1.lookup("test") shouldEqual Some(5)
+    test1.lookup("team") shouldEqual Some(6)
+    test1.lookup("toast") shouldEqual Some(7)
+
+    val test2 = test1.remove("slow")
+    test2.lookup("tester") shouldEqual Some(1)
+    test2.lookup("slow") shouldEqual None
+    test2.lookup("water") shouldEqual Some(3)
+    test2.lookup("slower") shouldEqual None
+    test2.lookup("test") shouldEqual Some(5)
+    test2.lookup("team") shouldEqual Some(6)
+    test2.lookup("toast") shouldEqual Some(7)
+
+    val test3 = test2.remove("tester")
+    test3.lookup("tester") shouldEqual None
+    test3.lookup("slow") shouldEqual None
+    test3.lookup("water") shouldEqual Some(3)
+    test3.lookup("slower") shouldEqual None
+    test3.lookup("test") shouldEqual Some(5)
+    test3.lookup("team") shouldEqual Some(6)
+    test3.lookup("toast") shouldEqual Some(7)
+
+    val test4 = test3.remove("team")
+    test4.lookup("tester") shouldEqual None
+    test4.lookup("slow") shouldEqual None
+    test4.lookup("water") shouldEqual Some(3)
+    test4.lookup("slower") shouldEqual None
+    test4.lookup("test") shouldEqual Some(5)
+    test4.lookup("team") shouldEqual None
+    test4.lookup("toast") shouldEqual Some(7)
+
+    val test5 = test4.remove("toast")
+    test5.lookup("tester") shouldEqual None
+    test5.lookup("slow") shouldEqual None
+    test5.lookup("water") shouldEqual Some(3)
+    test5.lookup("slower") shouldEqual None
+    test5.lookup("test") shouldEqual Some(5)
+    test5.lookup("team") shouldEqual None
+    test5.lookup("toast") shouldEqual None
+
+    val test6 = test5.remove("test")
+    test6.lookup("tester") shouldEqual None
+    test6.lookup("slow") shouldEqual None
+    test6.lookup("water") shouldEqual Some(3)
+    test6.lookup("slower") shouldEqual None
+    test6.lookup("test") shouldEqual None
+    test6.lookup("team") shouldEqual None
+    test6.lookup("toast") shouldEqual None
+
+    val test7 = test6.remove("water")
+    test7.lookup("tester") shouldEqual None
+    test7.lookup("slow") shouldEqual None
+    test7.lookup("water") shouldEqual None
+    test7.lookup("slower") shouldEqual None
+    test7.lookup("test") shouldEqual None
+    test7.lookup("team") shouldEqual None
+    test7.lookup("toast") shouldEqual None
+  }
 }

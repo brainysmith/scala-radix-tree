@@ -19,8 +19,7 @@ class RadixTree[V](private val root: MiddleNode[V]) {
 
   def foldBreadth[A](acc: A)(op: (A, (String, Option[V])) => A) = _breadthFirstTravers(root.edges)(acc)(op)
 
-  //def remove(key: String): RadixTree[V] = ???
-
+  def remove(key: String): RadixTree[V] = new RadixTree(_delete(key, root))
 
 
   @inline private def _findPosStringStartDiffer(a: String, b: String): Option[Int] = (0 until (a.length max b.length)).find(i => a.lift(i) != b.lift(i))
@@ -83,17 +82,55 @@ class RadixTree[V](private val root: MiddleNode[V]) {
     }
   }
 
-  /*private def _delete(key: String, root: MiddleNode[V]): MiddleNode[V] = {
+  private def _excludeElem(src: Array[Edge[V]], idx: Int): Array[Edge[V]] = {
+    val len = src.length
+    val dst = new Array[Edge[V]](len - 1)
+    Array.copy(src, 0, dst, 0, idx)
+    Array.copy(src, idx + 1, dst, idx, len - idx - 1)
+    dst
+  }
+
+  private def _delete(key: String, root: MiddleNode[V]): MiddleNode[V] = {
     val idx = root.edges.indexWhere(e => (key.isEmpty && e.prefix.isEmpty) || (e.prefix.nonEmpty && key.startsWith(e.prefix)))
-    if(idx = -1) {
+    if(idx == -1) {
       root
     } else {
       root.edges(idx) match {
-        case Edge(p, LeafNode(_)) if key == p => MiddleNode(root.edges.)
+        case Edge(p, LeafNode(_)) if key == p => MiddleNode(_excludeElem(root.edges, idx))
+        case Edge(p, LeafNode(_)) => root
+        case Edge(p, MiddleNode(es)) => 
+          val mn = MiddleNode(root.edges.clone())
+          __delete(key.drop(p.length), p, es, mn, idx, mn)
       }
     }
-  }*/
+  }
 
+  @tailrec private def __delete(key: String, prefix: String, edges: Array[Edge[V]], mn: MiddleNode[V], i: Int, root:  MiddleNode[V]): MiddleNode[V] = {
+    val idx = edges.indexWhere(e => (key.isEmpty && e.prefix.isEmpty) || (e.prefix.nonEmpty && key.startsWith(e.prefix)))
+    if(idx == -1) {
+      root
+    } else {
+      edges(idx) match {
+        case Edge(p, LeafNode(_)) if key == p => 
+          if(edges.size == 2) {
+            val leftEdge = edges((idx + 1) & 0x01)
+            val parentEdge = mn.edges(i)
+            mn.edges(i) = Edge(parentEdge.prefix + leftEdge.prefix, leftEdge.node)
+          } else if(edges.size > 2) {
+            val n = MiddleNode(_excludeElem(edges, idx))
+            mn.edges(i) = Edge(prefix, n)
+          } else {
+            throw new IllegalStateException("Unbalanced tree")
+          }
+          root
+        case Edge(p, LeafNode(_)) => root
+        case Edge(p, MiddleNode(es)) => 
+          val n = MiddleNode(edges.clone())
+          mn.edges(i) = Edge(prefix, n)
+          __delete(key.drop(p.length), p, es, n, idx, root)
+      }
+    }
+  }
 
   @tailrec private def _search(edges: Array[Edge[V]], key: String): Option[V] = {
     edges.find(e => (key.isEmpty && e.prefix.isEmpty) || (e.prefix.nonEmpty && key.startsWith(e.prefix))) match {

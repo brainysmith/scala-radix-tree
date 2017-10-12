@@ -6,5 +6,6 @@ lazy val root = (project in file(".")).
       version      := "0.1.0-SNAPSHOT"
     )),
     name := "Radix-Tree",
+    scalacOptions ++= Seq("-deprecation"),
     libraryDependencies += "org.scalatest" %% "scalatest" % "3.0.1" % Test
   )

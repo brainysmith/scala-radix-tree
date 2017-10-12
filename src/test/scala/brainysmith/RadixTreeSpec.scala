@@ -13,15 +13,15 @@ class RadixTreeSpec extends FlatSpec with Matchers {
       .insert("toast", 7)
     val acc = rt.foldDepth(Seq[(String, Option[Int])]())((a, e) => a :+ e)
     acc shouldEqual List(("t", None), 
-      ("e", None), 
-      ("st", None), 
-      ("er", Some(1)), 
-      ("", Some(5)), 
-      ("am", Some(6)), 
-      ("oast", Some(7)), 
+      ("te", None), 
+      ("test", None), 
+      ("tester", Some(1)), 
+      ("test", Some(5)), 
+      ("team", Some(6)), 
+      ("toast", Some(7)), 
       ("slow", None), 
-      ("", Some(2)), 
-      ("er", Some(4)), 
+      ("slow", Some(2)), 
+      ("slower", Some(4)), 
       ("water", Some(3)))
   }
 
@@ -129,5 +129,49 @@ class RadixTreeSpec extends FlatSpec with Matchers {
     test7.lookup("test") shouldEqual None
     test7.lookup("team") shouldEqual None
     test7.lookup("toast") shouldEqual None
+  }
+
+  "The RadixTree " should "handle supper types correctly" in {
+
+    class Parent(val p: Int) { 
+      override def equals(o: Any): Boolean = o.isInstanceOf[Parent] && o.asInstanceOf[Parent].p == p
+      override def toString(): String = s"Parent($p)" 
+    }
+    class Child(val c: Int) extends Parent(c) { 
+      override def equals(o: Any): Boolean = o.isInstanceOf[Child] && o.asInstanceOf[Child].c == c
+      override def toString(): String = s"Child($c)" 
+    }
+
+    val rt: RadixTree[Child] = RadixTree("tester" -> new Child(1), "slow" -> new Child(2))
+      .insert("test", new Child(5))
+      .insert("team", new Child(6))
+
+    rt.lookup("tester") shouldEqual Some(new Child(1))
+    rt.lookup("slow") shouldEqual Some(new Child(2))
+    rt.lookup("test") shouldEqual Some(new Child(5))
+    rt.lookup("team") shouldEqual Some(new Child(6))
+
+    val rt2: RadixTree[Parent] = rt + ("water" -> new Parent(3)) + ("toast" -> new Parent(7))
+    rt2.lookup("tester") shouldEqual Some(new Child(1))
+    rt2.lookup("slow") shouldEqual Some(new Child(2))
+    rt2.lookup("water") shouldEqual Some(new Parent(3))
+    rt2.lookup("test") shouldEqual Some(new Child(5))
+    rt2.lookup("team") shouldEqual Some(new Child(6))
+    rt2.lookup("toast") shouldEqual Some(new Parent(7))
+  }
+
+  "The RadixTree iterator" should "work correctly" in {
+    val rt = RadixTree("tester" -> 1, "slow" -> 2)
+      .insert("water", 3)
+      .insert("slower", 4)
+      .insert("test", 5)
+      .insert("team", 6)
+      .insert("toast", 7)
+
+      val itr = rt.iterator
+      var collector: List[(String, Int)] = List()
+      while(itr.hasNext) collector = collector :+ itr.next
+      collector shouldEqual List("tester" -> 1, "test" -> 5, "team" -> 6, "toast" -> 7, "slow" -> 2, "slower" -> 4, "water" -> 3)
+        
   }
 }

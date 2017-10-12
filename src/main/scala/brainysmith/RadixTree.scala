@@ -1,15 +1,27 @@
 package brainysmith
 
 import scala.annotation.tailrec
+import scala.collection.mutable.Stack
 
-final case class Edge[V](val prefix: String, node: Node[V])
-sealed trait Node[V] { val isLeaf: Boolean }
+final case class Edge[+V](val prefix: String, node: Node[V])
+sealed trait Node[+V] { val isLeaf: Boolean }
 final case class MiddleNode[V](val edges: Array[Edge[V]]) extends Node[V] { val isLeaf = false }
 final case class LeafNode[V](val value: V) extends Node[V] { val isLeaf = true }
 
-class RadixTree[V](private val root: MiddleNode[V]) {
+class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] {
 
-  def insert(key: String, value: V): RadixTree[V] = new RadixTree(_update(key, value, root))
+  override def get(key: String): Option[V] = lookup(key)
+
+  override def iterator: Iterator[(String, V)] = new RadixIterator[V](root)
+
+  override def + [V1 >: V](kv: (String, V1)): RadixTree[V1] = insert(kv._1, kv._2)
+
+  override def -(key: String): RadixTree[V] = remove(key)
+
+  override def empty: RadixTree[V] = RadixTree.empty
+
+
+  def insert[V1 >: V](key: String, value: V1): RadixTree[V1] = new RadixTree(_update(key, value, root))
 
   def lookup(key: String): Option[V] = _search(root.edges, key)
 
@@ -29,16 +41,21 @@ class RadixTree[V](private val root: MiddleNode[V]) {
     if(idx == -1) None else Some(idx)
   }
 
-  private def _update(key: String, value: V, root: MiddleNode[V]): MiddleNode[V] = {
+
+  private def _update[V1 >: V](key: String, value: V1, root: MiddleNode[V]): MiddleNode[V1] = {
     val idx = _matched(root.edges, key)
     val node = idx.fold{
-      val na = new Array[Edge[V]](root.edges.length + 1)
+      val na = new Array[Edge[V1]](root.edges.length + 1)
       root.edges.copyToArray(na)
-    MiddleNode(na)}(_ => MiddleNode(root.edges.clone()))
+    MiddleNode(na)}{_ => 
+      val na = new Array[Edge[V1]](root.edges.length)
+      Array.copy(root.edges, 0, na, 0, root.edges.length)
+      MiddleNode(na)
+    }
     __update(key, value, node, idx, node)
   }
 
-  @tailrec private def __update(key: String, value: V, node: MiddleNode[V], optIdx: Option[Int], root: MiddleNode[V]): MiddleNode[V] = {
+  @tailrec private def __update[V1 >: V](key: String, value: V1, node: MiddleNode[V1], optIdx: Option[Int], root: MiddleNode[V1]): MiddleNode[V1] = {
     if(optIdx.isEmpty) {
       node.edges(node.edges.length - 1) = Edge(key, LeafNode(value))
       root
@@ -52,7 +69,7 @@ class RadixTree[V](private val root: MiddleNode[V]) {
         case None =>
           val n = edge.node.asInstanceOf[MiddleNode[V]]
           val i = _matched(n.edges, "")
-          val nn = MiddleNode[V](i.fold(n.edges.clone() :+ Edge("", LeafNode(value)))(i => n.edges.updated(i, Edge("", LeafNode(value)))))
+          val nn = MiddleNode[V1](i.fold(n.edges.clone() :+ Edge("", LeafNode(value)))(i => n.edges.updated(i, Edge("", LeafNode(value)))))
           node.edges(idx) = edge.copy(node = nn)
           root
         case Some(p) if p == edge.prefix.length && edge.node.isLeaf => //Exact prefix match
@@ -66,9 +83,13 @@ class RadixTree[V](private val root: MiddleNode[V]) {
           val n = edge.node.asInstanceOf[MiddleNode[V]]
           val i = _matched(n.edges, suffix)
           val nn = i.fold{
-            val na = new Array[Edge[V]](n.edges.length + 1)
+            val na = new Array[Edge[V1]](n.edges.length + 1)
             n.edges.copyToArray(na)
-          MiddleNode(na)}(_ => MiddleNode(n.edges.clone()))
+          MiddleNode(na)}{_ => 
+            val na = new Array[Edge[V1]](n.edges.length)
+            Array.copy(n.edges, 0, na, 0, n.edges.length)
+            MiddleNode(na)
+          }
           node.edges(idx) = edge.copy(node = nn)
           __update(suffix, value, nn, i, root)
         case Some(p) => //Empty edge and common prefix
@@ -160,25 +181,49 @@ class RadixTree[V](private val root: MiddleNode[V]) {
   }
 
   @inline private def _depthFirstTravers[A](rte: Array[Edge[V]])(acc: A)(op: (A, (String, Option[V])) => A) = {
-    @tailrec def __depth(nodes: List[Edge[V]], a: A): A = nodes match {
+    @tailrec def __depth(nodes: List[(String, Edge[V])], a: A): A = nodes match {
       case Nil => a
-      case Edge(prefix, LeafNode(value)) :: tail => 
-        __depth(tail, op(a, (prefix, Some(value))))
-      case Edge(prefix, MiddleNode(edges)) :: tail => 
-        __depth(edges.toList ::: tail, op(a, (prefix, None)))
+      case (parent, Edge(p, LeafNode(value))) :: tail => 
+        __depth(tail, op(a, (parent + p, Some(value))))
+      case (parent, Edge(p, MiddleNode(edges))) :: tail => 
+        __depth(edges.map(v => ((parent + p) -> v)).toList ::: tail, op(a, (parent + p, None)))
     }
-    __depth(rte.toList, acc)
+    __depth(rte.map(v => ("" -> v)).toList, acc)
   }
 
   @inline private def _breadthFirstTravers[A](rte: Array[Edge[V]])(acc: A)(op: (A, (String, Option[V])) => A) = {
-    @tailrec def __depth(nodes: List[Edge[V]], a: A): A = nodes match {
+    @tailrec def __depth(nodes: List[(String, Edge[V])], a: A): A = nodes match {
       case Nil => a
-      case Edge(prefix, LeafNode(value)) :: tail => 
-        __depth(tail, op(a, (prefix, Some(value))))
-      case Edge(prefix, MiddleNode(edges)) :: tail => 
-        __depth(tail ::: edges.toList, op(a, (prefix, None)))
+      case (parent, Edge(p, LeafNode(value))) :: tail => 
+        __depth(tail, op(a, (parent + p, Some(value))))
+      case (parent, Edge(p, MiddleNode(edges))) :: tail => 
+        __depth(tail ::: edges.map(v => ((parent + p) -> v)).toList, op(a, (parent + p, None)))
     }
-    __depth(rte.toList, acc)
+    __depth(rte.map(v => ("" -> v)).toList, acc)
+  }
+
+  class RadixIterator[V](private val root: MiddleNode[V]) extends Iterator[(String, V)] {
+    private var stack: List[(String, Edge[V])] = List(root.edges.map(v => "" -> v): _*)
+    private var value: Option[(String, V)] = _advance()
+
+    @tailrec private def _advance(): Option[(String, V)] = {
+      stack match {
+        case Nil => None
+        case (parent, Edge(p, LeafNode(v))) :: tail => 
+          stack = tail
+          Some((parent + p, v))
+        case (parent, Edge(p, MiddleNode(edges))) :: tail => 
+          stack = edges.map(v => ((parent + p) -> v)).toList ::: tail
+          _advance()
+      }
+    }
+
+    override def hasNext: Boolean = value.nonEmpty
+    override def next(): (String, V) = {
+      val res = value.get
+      if(value.nonEmpty) value = _advance()
+      res
+    }
   }
 
 }

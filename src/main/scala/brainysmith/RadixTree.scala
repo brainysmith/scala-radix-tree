@@ -25,7 +25,7 @@ class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] {
 
   def lookup(key: String): Option[V] = _search(root.edges, key)
 
-  def findAllWithPrefix(prefix: String): Seq[V] = _searchWithPrefix(root.edges, prefix)
+  def findAllWithPrefix(prefix: String): Seq[(String, V)] = _searchWithPrefix(root.edges, prefix, prefix)
 
   def foldDepth[A](acc: A)(op: (A, (String, Option[V])) => A) = _depthFirstTravers(root.edges)(acc)(op)
 
@@ -162,19 +162,19 @@ class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] {
     }
   }
 
-  @tailrec private def _searchWithPrefix(edges: Array[Edge[V]], prefix: String): Seq[V] = {
+  @tailrec private def _searchWithPrefix(edges: Array[Edge[V]], prefix: String, fullPrefix: String): Seq[(String, V)] = {
     if(prefix.isEmpty) {
-      _depthFirstTravers(edges)(Seq[V]()){case (a, (_, Some(b))) => a :+ b
+      _depthFirstTravers(edges)(Seq[(String, V)]()){case (a, (p, Some(b))) => a :+ (fullPrefix + p -> b)
       case (a, (_, None)) => a}
     } else {
       _matched(edges, prefix) match {
-        case None => Seq[V]()
+        case None => Seq[(String, V)]()
         case Some(p) => edges(p) match {
-          case Edge(p, MiddleNode(es)) if p == prefix || p.startsWith(prefix) => _depthFirstTravers(es)(Seq[V]()){case (a, (_, Some(b))) => a :+ b
+          case Edge(p, MiddleNode(es)) if p == prefix || p.startsWith(prefix) => _depthFirstTravers(es)(Seq[(String, V)]()){case (a, (p, Some(b))) => a :+ (fullPrefix + p -> b)
             case (a, (_, None)) => a}
-          case Edge(p, LeafNode(v)) if p == prefix || p.startsWith(prefix) => Seq(v)
-          case Edge(p, MiddleNode(es)) if prefix.startsWith(p) => _searchWithPrefix(es, prefix.drop(p.length))
-          case Edge(p, LeafNode(_)) if prefix.startsWith(p) => Seq[V]()
+            case Edge(p, LeafNode(v)) if p == prefix || p.startsWith(prefix) => Seq(fullPrefix + p -> v)
+          case Edge(p, MiddleNode(es)) if prefix.startsWith(p) => _searchWithPrefix(es, prefix.drop(p.length), fullPrefix)
+          case Edge(p, LeafNode(_)) if prefix.startsWith(p) => Seq[(String, V)]()
         }
       }
     }

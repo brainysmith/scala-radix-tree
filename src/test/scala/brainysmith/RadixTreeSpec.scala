@@ -53,10 +53,10 @@ class RadixTreeSpec extends FlatSpec with Matchers {
       .insert("toast", 7)
 
       rt.findAllWithPrefix("none") shouldEqual List()
-      rt.findAllWithPrefix("test") shouldEqual List(1, 5)
-      rt.findAllWithPrefix("te") shouldEqual List(1, 5, 6)
-      rt.findAllWithPrefix("t") shouldEqual List(1, 5, 6, 7)
-      rt.findAllWithPrefix("") shouldEqual List(1, 5, 6, 7, 2, 4, 3)
+      rt.findAllWithPrefix("test") shouldEqual List("tester" -> 1, "test" -> 5)
+      rt.findAllWithPrefix("te") shouldEqual List("tester" -> 1, "test" -> 5, "team" -> 6)
+      rt.findAllWithPrefix("t") shouldEqual List("tester" -> 1, "test" -> 5, "team" -> 6, "toast" -> 7)
+      rt.findAllWithPrefix("") shouldEqual List("tester" -> 1, "test" -> 5, "team" -> 6, "toast" -> 7, "slow" -> 2, "slower" -> 4, "water" -> 3)
   }
 
   "The RadixTree " should "delete correctly" in {

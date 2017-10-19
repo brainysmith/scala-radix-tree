@@ -2,13 +2,17 @@ package brainysmith
 
 import scala.annotation.tailrec
 import scala.collection.mutable.Stack
+import scala.collection.MapLike
+import scala.collection.generic.CanBuildFrom
+import scala.collection.generic.ImmutableMapFactory
+import scala.collection.mutable.Builder
 
 final case class Edge[+V](val prefix: String, node: Node[V])
 sealed trait Node[+V] { val isLeaf: Boolean }
 final case class MiddleNode[V](val edges: Array[Edge[V]]) extends Node[V] { val isLeaf = false }
 final case class LeafNode[V](val value: V) extends Node[V] { val isLeaf = true }
 
-class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] {
+class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] with MapLike[String, V, RadixTree[V]] {
 
   override def get(key: String): Option[V] = lookup(key)
 
@@ -61,7 +65,7 @@ class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] {
       root
     } else { 
       val idx = optIdx.get
-      val edge = root.edges(idx)
+      val edge = node.edges(idx)
       _findPosStringStartDiffer(key, edge.prefix) match {
         case None if edge.node.isLeaf => 
           node.edges(idx) = edge.copy(node = LeafNode(value))
@@ -234,5 +238,21 @@ object RadixTree {
   def apply[V](pairs: (String, V)*): RadixTree[V] = pairs.foldLeft(empty[V])((a, b) => a.insert(b._1, b._2))
 
   def empty[V]: RadixTree[V] = new RadixTree(MiddleNode[V](Array.empty))
+
+  implicit def canBuildFrom[V]: CanBuildFrom[RadixTree[V], (String, V), RadixTree[V]] = new RadixTreeCanBuildFrom[V]
+
+  class RadixTreeCanBuildFrom[V] extends CanBuildFrom[RadixTree[V], (String, V), RadixTree[V]] {
+    def apply(): Builder[(String, V), RadixTree[V]] = new RadixTreeBuilder[V](empty)
+    def apply(from: RadixTree[V]): Builder[(String, V), RadixTree[V]] = new RadixTreeBuilder(from)
+  }
+
+  class RadixTreeBuilder[V](var acc: RadixTree[V]) extends Builder[(String, V), RadixTree[V]] {
+    def +=(elem: (String, V)) = {
+      acc = acc + elem
+      this
+    }
+    def clear(): Unit = { acc = empty }
+    def result(): RadixTree[V] = acc
+  }
 
 }

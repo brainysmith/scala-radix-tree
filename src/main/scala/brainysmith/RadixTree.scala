@@ -173,12 +173,12 @@ class RadixTree[V](private val root: MiddleNode[V]) extends Map[String, V] with 
     } else {
       _matched(edges, prefix) match {
         case None => Seq[(String, V)]()
-        case Some(p) => edges(p) match {
-          case Edge(p, MiddleNode(es)) if p == prefix || p.startsWith(prefix) => _depthFirstTravers(es)(Seq[(String, V)]()){case (a, (p, Some(b))) => a :+ (fullPrefix + p -> b)
+        case Some(pi) => edges(pi) match {
+          case Edge(p, MiddleNode(es)) if p == prefix || p.startsWith(prefix) => _depthFirstTravers(es)(Seq[(String, V)]()){case (a, (pt, Some(b))) => a :+ (fullPrefix.dropRight(prefix.length) + p + pt -> b)
             case (a, (_, None)) => a}
-            case Edge(p, LeafNode(v)) if p == prefix || p.startsWith(prefix) => Seq(fullPrefix + p -> v)
+          case Edge(p, LeafNode(v)) if p == prefix || p.startsWith(prefix) => Seq(fullPrefix.dropRight(prefix.length) + p -> v)
           case Edge(p, MiddleNode(es)) if prefix.startsWith(p) => _searchWithPrefix(es, prefix.drop(p.length), fullPrefix)
-          case Edge(p, LeafNode(_)) if prefix.startsWith(p) => Seq[(String, V)]()
+          case Edge(_, _) => Seq[(String, V)]()
         }
       }
     }
